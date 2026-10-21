@@ -1,0 +1,31 @@
+// vane/dill — %d, the terminal.  The smallest honest vane: it
+// takes a task and gives a gift, so it exercises +call and the
+// %give leg of the duct without needing state beyond a counter.
+import lull;
+
+struct St { blits: @ };
+
+func call(s: St, duct: lull.Duct, task: lull.Card)
+    -> (List<lull.Move>, St) {
+  if task.mark == %text {
+    // Arvo's dill gives %blit to the terminal's OWN duct, which
+    // it holds from a prior %view.  This gives on the duct it was
+    // called on, which is the plain duct discipline and is what
+    // makes the effect observable at the runtime boundary.
+    (cons(lull.Move( duct: duct,
+                     ball: lull.Ball.give(
+                             lull.Card( mark: %blit, data: task.data )),
+                     dud: ~ ), ~),
+     St( blits: s.blits + 1 ))
+  } else {
+    crash
+  }
+};
+
+// dill passes nothing, so nothing can return to it.  The arm
+// exists anyway: +take is half the vane interface, and being
+// un-re-enterable is a fact about THIS vane, not about the shape.
+func take(s: St, duct: lull.Duct, wire: lull.Wire, sign: lull.Sign)
+    -> (List<lull.Move>, St) {
+  crash
+};

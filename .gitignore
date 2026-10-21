@@ -1,0 +1,6 @@
+#  build products:  the trap kern.sh emits and the core honk-kick
+#  evaluates it into.  Both are derived from pkg/, and the trap
+#  embeds the source anyway.
+out/
+*.jam
+__pycache__/

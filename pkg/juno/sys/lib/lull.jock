@@ -1,0 +1,63 @@
+// lib/lull — the vocabulary the kernel and its vanes agree on.
+// Named for Arvo's %lull, which plays the same part: the types,
+// and nothing that computes.
+//
+// WHAT PORTS AND WHAT DOES NOT.  Arvo's $card is a (cask):
+// [mark=@tas vase].  The MARK ports.  It is wire-format data --
+// it names a payload's shape for a peer that may be a different
+// ship running different code -- and no amount of static typing
+// removes the need for it.  The VASE does not port.  Arvo pairs
+// every payload with a Hoon $type so that a vane can +slap
+// against a value whose type it did not know when it was
+// compiled.  A juno vane is a gate with a static signature, so
+// that type is discharged at compile time and the runtime
+// carries the noun alone.  Deleting the vase deletes $maze,
+// $meta, +hypo, $vile, +viol, $worm, +wa, +refine-moves, and
+// every +slap and +slop with them.
+
+// a wire is a path, outermost term first; a duct is the causal
+// stack of wires, most recent frame first.
+alias Wire is List<@>;
+alias Duct is List<Wire>;
+
+// the (cask), with the vase taken out
+struct Card { mark: @, data: * };
+// the runtime boundary: Arvo's $ovum
+struct Ovum { wire: Wire, card: Card };
+
+// a NOTE is a request as the CALLER states it -- it names a
+// target vane.  The TASK inside is the same request as the
+// callee receives it.
+struct Note { vane: @, task: Card };
+// a PASS carries the caller's own wire beside the note.  That
+// wire is what comes back to the caller in its +take.
+struct Pass { wire: Wire, note: Note };
+// a SIGN is a response as the CALLER receives it: +take conses
+// the SOURCE vane onto the gift to build one.
+struct Sign { vane: @, gift: Card };
+
+// Arvo's $goof.  Its .tang is rendered text rather than a Hoon
+// $tang, because a tang is a (list tank) and a tank is
+// pretty-printer input -- a Hoon value, not a noun shape.
+struct Goof { mote: @, tang: List<String> };
+
+// Arvo's $ball is (wite [vane task] maze), whose %hurl case
+// carries ANOTHER ball.  That is a recursive union, which Jock
+// cannot declare.  It does not need to: %hurl's entire effect in
+// +step is "set .dud and re-step the inner ball", so carrying the
+// goof as a field of the move is exactly equivalent at the one
+// level of nesting Arvo ever produces, and is flatter to read.
+enum Ball { pass(Pass), give(Card), slip(Note) };
+struct Move { duct: Duct, ball: Ball, dud: Goof? };
+
+// Arvo's $plan is (pair germ (list move)) with germ = [vane bars].
+// .vane is the SOURCE of every move in the list, and is
+// load-bearing: %pass conses it onto the wire, %give conses it
+// onto the gift.  .bars is a duct stack kept only for the ~?
+// trace, and is dropped.
+struct Plan { vane: @, moves: List<Move> };
+
+// Arvo spells the pseudo-vane %$ -- itself on the way in, the
+// runtime on the way out.  %$ is the atom 0; Jock has no empty
+// term literal, so it is named here rather than spelled inline.
+func outside() -> @ { 0 };

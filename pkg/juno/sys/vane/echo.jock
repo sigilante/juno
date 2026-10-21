@@ -1,0 +1,43 @@
+// vane/echo — %e, a vane that exists to exercise the half of the
+// loop dill alone cannot reach.  It PASSES, so the duct grows,
+// and it TAKES, so the duct unwinds.  One event therefore drives
+// pass -> call -> give -> take -> give-to-the-runtime, which is
+// every mechanism in +step except %slip.
+import lull;
+
+struct St { echoes: @ };
+
+func call(s: St, duct: lull.Duct, task: lull.Card)
+    -> (List<lull.Move>, St) {
+  if task.mark == %echo {
+    // the wire is OURS: it is what comes back in +take, and the
+    // loop conses our name onto it before pushing it on the duct.
+    (cons(lull.Move(
+            duct: duct,
+            ball: lull.Ball.pass(lull.Pass(
+                    // a BARE cons, not cons(%say, ~): the term's
+                    // singleton type solves cons's T, and
+                    // List<%say> does not nest into List<@>.  In
+                    // field position the cons cell nests directly.
+                    wire: (%say, ~),
+                    note: lull.Note( vane: %d,
+                            task: lull.Card( mark: %text,
+                                             data: task.data )))),
+            dud: ~ ), ~),
+     s)
+  } else {
+    crash
+  }
+};
+
+func take(s: St, duct: lull.Duct, wire: lull.Wire, sign: lull.Sign)
+    -> (List<lull.Move>, St) {
+  // dill answered on /say.  Acknowledge to whoever called us --
+  // which for an event from outside is the runtime, so the loop
+  // turns this give into an ovum.
+  (cons(lull.Move( duct: duct,
+                   ball: lull.Ball.give(
+                           lull.Card( mark: %ack, data: sign.gift.data )),
+                   dud: ~ ), ~),
+   St( echoes: s.echoes + 1 ))
+};

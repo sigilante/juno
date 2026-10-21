@@ -1,1 +1,203 @@
-~
+// sys/juno — an Arvo in Jock.
+//
+// Arvo is an event processor whose outer interface is four arms
+// at four fixed axes: +load/+4, +wish/+10, +peek/+22, +poke/+23.
+// A Jock kernel built by jock's own tools/kern.sh already lands
+// its arms on exactly those axes, so this is a port of Arvo's
+// SEMANTICS onto an ABI that was already Arvo-shaped.  See
+// README.md for what that does and does not buy.
+//
+// What is here: the move loop, with Arvo's duct discipline
+// (%pass pushes a wire, %give pops one), its worklist stack,
+// its depth-first ordering, its %$ pseudo-vane for the runtime
+// boundary, and two vanes to drive all of it.
+//
+// What is deliberately not here: +wish (it IS the Hoon compiler),
+// %veer-style runtime vane installation (a vane is code, not a
+// vase), kelvin negotiation, OTA, and the +spin context that
+// hands a vane the clock and entropy.  README.md says which of
+// those are impossible and which are merely unbuilt.
+import lull;
+import dill;
+import echo;
+
+// The vane states, threaded through the loop on their own so the
+// loop does not respell the kernel's scalar fields at every step.
+struct Vanes { d: dill.St, e: echo.St };
+
+// Arvo's persistent state is [pit vil lac eny our bud vanes].
+// .pit and .vil are a compiled-type cache and .bud is %zuse:
+// all three exist to serve the vase layer, and all three are
+// gone.  What is left is the part that was never about types.
+struct Juno { now: @, our: @, eny: @, lac: @, v: Vanes };
+
+// the event the runtime hands +23.  Arvo's sample is
+// [now=@da ovo=ovum] with ovum=[wire card] and card=[mark noun],
+// which flattens to this four-field mirror.
+struct Event { now: @, wire: lull.Wire, mark: @, data: * };
+
+// ---------------------------------------------------------------
+// The loop.  These four arms are mutually recursive and must stay
+// CONTIGUOUS: Jock makes a run of consecutive `func`s visible to
+// one another, and any interposed declaration splits the run and
+// turns the forward calls into %mint-limb.
+// ---------------------------------------------------------------
+
+// +vcall: route a task to a vane, replacing that vane's state.
+// Arvo looks the vane up in a (map term vane) and +slaps it;
+// here the table is a static dispatch, because a vane is code.
+func vcall(v: Vanes, way: @, duct: lull.Duct, task: lull.Card)
+    -> (List<lull.Move>, Vanes) {
+  if way == %d {
+    match dill.call(v.d, duct, task) {
+      (mz, d2) => (mz, Vanes( d: d2, e: v.e )),
+    }
+  } else if way == %e {
+    match echo.call(v.e, duct, task) {
+      (mz, e2) => (mz, Vanes( d: v.d, e: e2 )),
+    }
+  } else {
+    // Arvo routes way=%$ to +call:pith, its own %trim/%verb/%whey
+    // self-tasks.  juno has no self-tasks yet.
+    crash
+  }
+};
+
+// +vtake: hand a vane a response on the wire it passed.
+func vtake(v: Vanes, way: @, duct: lull.Duct, wire: lull.Wire,
+           sign: lull.Sign) -> (List<lull.Move>, Vanes) {
+  if way == %d {
+    match dill.take(v.d, duct, wire, sign) {
+      (mz, d2) => (mz, Vanes( d: d2, e: v.e )),
+    }
+  } else if way == %e {
+    match echo.take(v.e, duct, wire, sign) {
+      (mz, e2) => (mz, Vanes( d: v.d, e: e2 )),
+    }
+  } else {
+    crash
+  }
+};
+
+// +step: route one move.  This is Arvo's +step arm, case for case.
+func step(v: Vanes, src: @, mv: lull.Move, run: List<lull.Plan>,
+          out: List<lull.Ovum>) -> (List<lull.Ovum>, Vanes) {
+  match mv.ball {
+    // %pass: cons the SOURCE onto the wire, and the wire onto the
+    // duct.  That is the whole of Arvo's causal bookkeeping.
+    .pass(p) => {
+      let d2 = cons(cons(src, p.wire), mv.duct);
+      match vcall(v, p.note.vane, d2, p.note.task) {
+        (mz, v2) =>
+          drain(v2, cons(lull.Plan( vane: p.note.vane, moves: mz ), run), out),
+      }
+    },
+    // %slip: lateral.  The duct is NOT touched, so the callee's
+    // eventual %give returns to the original caller rather than to
+    // the slipping vane.  Arvo's own comment calls this a code
+    // smell that should nearly always be avoided; it is here
+    // because the loop is not faithful without it.
+    .slip(n) => match vcall(v, n.vane, mv.duct, n.task) {
+      (mz, v2) =>
+        drain(v2, cons(lull.Plan( vane: n.vane, moves: mz ), run), out),
+    },
+    // %give: pop the duct.  The popped wire's HEAD names the
+    // target and its TAIL is the wire handed back to that target.
+    .give(g) => match mv.duct {
+      ~ => crash,
+      (w, d2) => match w {
+        ~ => crash,
+        (way, wr) => if way == lull.outside() {
+          // the caller was the runtime.  Arvo asserts the duct is
+          // empty here, and the assert is worth keeping: a give to
+          // the outside from anywhere but the bottom of the stack
+          // means a wire was pushed and never popped.
+          match d2 {
+            ~ => drain(v, run, cons(lull.Ovum( wire: wr, card: g ), out)),
+            _ => crash,
+          }
+        } else {
+          // cons the SOURCE onto the gift to make a sign
+          match vtake(v, way, d2, wr, lull.Sign( vane: src, gift: g )) {
+            (mz, v2) =>
+              drain(v2, cons(lull.Plan( vane: way, moves: mz ), run), out),
+          }
+        },
+      },
+    },
+  }
+};
+
+// +drain: Arvo's +loop.  .run is a stack of worklists and .out
+// accumulates reversed, exactly as +abet flops it.
+//
+// ORDERING.  A step's own moves are pushed on the FRONT of .run,
+// so they run before the rest of the current worklist: that is
+// depth-first, which is what Arvo does today.  Arvo intends to
+// move to breadth-first, which guarantees moves are processed in
+// the order they were emitted.  Here that is one word -- append
+// instead of cons, in the three +step sites and nowhere else.
+func drain(v: Vanes, run: List<lull.Plan>, out: List<lull.Ovum>)
+    -> (List<lull.Ovum>, Vanes) {
+  match run {
+    ~ => (lx-rev(out), v),
+    (p, rest) => match p.moves {
+      ~ => drain(v, rest, out),
+      (mv, more) =>
+        step(v, p.vane, mv,
+             cons(lull.Plan( vane: p.vane, moves: more ), rest), out),
+    },
+  }
+};
+
+// ---------------------------------------------------------------
+// The four arms, as an explicit (poke, peek, load, state) quad.
+// The quad is used rather than `impl Kernel` because Kernel fixes
+// poke's return to (List<Effect>, Self) and an Arvo gives ovums.
+// ---------------------------------------------------------------
+(
+  // +poke/+23.  Arvo seeds a worklist of one whose germ vane is
+  // %$ -- itself -- and whose single move is a %pass built by
+  // +gest, then drains to quiescence.
+  lambda (s: Juno, e: *) -> (List<lull.Ovum>, Juno) {
+    let ev = e as! Event;
+    // +gest: the ovum's wire HEAD names the target vane and its
+    // tail is the wire the vane is called on.
+    match ev.wire {
+      ~ => crash,
+      (way, wr) => {
+        let m = lull.Move(
+          duct: ~,
+          ball: lull.Ball.pass(lull.Pass(
+                  wire: wr,
+                  note: lull.Note( vane: way,
+                          task: lull.Card( mark: ev.mark,
+                                           data: ev.data )))),
+          dud: ~ );
+        match drain(s.v, cons(lull.Plan( vane: lull.outside(),
+                                         moves: cons(m, ~) ), ~), ~) {
+          (fx, v2) => (fx, Juno( now: ev.now, our: s.our, eny: s.eny,
+                                 lac: s.lac, v: v2 )),
+        }
+      },
+    }
+  },
+  // +peek/+22.  Arvo's sample is [lyc=gang nom=...] and it threads
+  // into each vane's +scry.  This answers only the kernel's own
+  // state: a vane scry wants the +spin context the draft omits.
+  lambda (s: Juno, p: *) -> * {
+    let w = p as! List<@>;
+    match w {
+      ~ => s.now,
+      (h, t) => if h == %blits { s.v.d.blits }
+                else if h == %echoes { s.v.e.echoes }
+                else { crash },
+    }
+  },
+  // +load/+4.  Arvo runs +next-soul adapters across six state
+  // versions.  A same-shape graft is all a draft needs; a real one
+  // wants a versioned state union.
+  lambda (s: Juno, old: *) -> Juno { old as! Juno },
+  Juno( now: 0, our: 0, eny: 0, lac: 0,
+        v: Vanes( d: dill.St( blits: 0 ), e: echo.St( echoes: 0 ) ) )
+)
