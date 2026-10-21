@@ -7,7 +7,7 @@ import lull;
 
 struct St { echoes: @ };
 
-func call(s: St, duct: lull.Duct, task: lull.Card)
+func call(s: St, mien: lull.Mien, duct: lull.Duct, task: lull.Card)
     -> (List<lull.Move>, St) {
   if task.mark == %echo {
     // the wire is OURS: it is what comes back in +take, and the
@@ -30,8 +30,8 @@ func call(s: St, duct: lull.Duct, task: lull.Card)
   }
 };
 
-func take(s: St, duct: lull.Duct, wire: lull.Wire, sign: lull.Sign)
-    -> (List<lull.Move>, St) {
+func take(s: St, mien: lull.Mien, duct: lull.Duct, wire: lull.Wire,
+          sign: lull.Sign) -> (List<lull.Move>, St) {
   // dill answered on /say.  Acknowledge to whoever called us --
   // which for an event from outside is the runtime, so the loop
   // turns this give into an ovum.

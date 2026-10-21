@@ -102,6 +102,10 @@ def main(argv):
     ck("ovum mark is %blit", ovum[1][0], cord("blit"))
     ck("ovum carries the payload", ovum[1][1], cord("hi"))
     ck("dill counted one blit", fire(k1, 22, path("blits")), 1)
+    #  dill stamps mien.now into its own state, so a non-zero
+    #  .last is the only outside evidence that the context was
+    #  really handed down rather than built and dropped.
+    ck("the Mien's clock reached dill", fire(k1, 22, path("last")), 1)
     ck("echo untouched", fire(k1, 22, path("echoes")), 0)
     ck("now was taken from the event", fire(k1, 22, 0), 1)
 
@@ -120,6 +124,10 @@ def main(argv):
     ck("ovum mark is %ack", o2[1][0], cord("ack"))
     ck("payload survived the round trip", o2[1][1], cord("yo"))
     ck("dill was called again", fire(k2, 22, path("blits")), 2)
+    #  stronger than the short path: this dill call happened inside
+    #  a NESTED pass, so .last == 2 proves the Mien vcall built mid
+    #  loop carried THIS event's time and not the previous one's.
+    ck("nested call saw the new event time", fire(k2, 22, path("last")), 2)
     ck("echo took one sign", fire(k2, 22, path("echoes")), 1)
 
     #  +load/+4: the migration arm.  Feeding it the state exported
@@ -130,6 +138,7 @@ def main(argv):
     k3 = fire(core, 4, vexrun.slot(k2, 6))
     ck("loaded kernel answers blits", fire(k3, 22, path("blits")), 2)
     ck("loaded kernel answers echoes", fire(k3, 22, path("echoes")), 1)
+    ck("loaded kernel answers dill's clock", fire(k3, 22, path("last")), 2)
 
     print("\n%s" % ("FAILED: " + ", ".join(fails) if fails else "all ok"))
     return 1 if fails else 0

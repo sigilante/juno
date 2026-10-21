@@ -36,6 +36,16 @@ struct Pass { wire: Wire, note: Note };
 // the SOURCE vane onto the gift to build one.
 struct Sign { vane: @, gift: Card };
 
+// Arvo's $mien: the ambient context a vane is entitled to see.
+// Arvo hands a vane `[duct eny dud]` by +spin, and the clock and
+// identity come from the kernel's own state.  Jock has no ambient
+// context, so it travels as a parameter -- which is why this type
+// is named rather than inlined, and why a vane takes it and the
+// kernel does not take it back.  A vane sees this and its OWN
+// state, never the kernel's: in Arvo a vane cannot reach Arvo's
+// state either, and a vane that could write .now would be wrong.
+struct Mien { our: @, now: @, eny: @ };
+
 // Arvo's $goof.  Its .tang is rendered text rather than a Hoon
 // $tang, because a tang is a (list tank) and a tank is
 // pretty-printer input -- a Hoon value, not a noun shape.

@@ -1,11 +1,15 @@
 // vane/dill — %d, the terminal.  The smallest honest vane: it
 // takes a task and gives a gift, so it exercises +call and the
 // %give leg of the duct without needing state beyond a counter.
+//
+// It also stamps the Mien's clock into its state, which is the
+// only way to show from outside that the context really reached
+// the vane rather than being assembled and dropped.
 import lull;
 
-struct St { blits: @ };
+struct St { blits: @, last: @ };
 
-func call(s: St, duct: lull.Duct, task: lull.Card)
+func call(s: St, mien: lull.Mien, duct: lull.Duct, task: lull.Card)
     -> (List<lull.Move>, St) {
   if task.mark == %text {
     // Arvo's dill gives %blit to the terminal's OWN duct, which
@@ -16,7 +20,7 @@ func call(s: St, duct: lull.Duct, task: lull.Card)
                      ball: lull.Ball.give(
                              lull.Card( mark: %blit, data: task.data )),
                      dud: ~ ), ~),
-     St( blits: s.blits + 1 ))
+     St( blits: s.blits + 1, last: mien.now ))
   } else {
     crash
   }
@@ -25,7 +29,7 @@ func call(s: St, duct: lull.Duct, task: lull.Card)
 // dill passes nothing, so nothing can return to it.  The arm
 // exists anyway: +take is half the vane interface, and being
 // un-re-enterable is a fact about THIS vane, not about the shape.
-func take(s: St, duct: lull.Duct, wire: lull.Wire, sign: lull.Sign)
-    -> (List<lull.Move>, St) {
+func take(s: St, mien: lull.Mien, duct: lull.Duct, wire: lull.Wire,
+          sign: lull.Sign) -> (List<lull.Move>, St) {
   crash
 };

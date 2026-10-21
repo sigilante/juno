@@ -176,12 +176,20 @@ questions.
 
 Arvo `+spin`s a vane with `[duct eny dud]` so that the vane's own
 arms stay narrow and the context is implicit. Jock has nothing
-like it, so every vane arm carries the context explicitly:
-`call(s, duct, task)`, `take(s, duct, wire, sign)`.
+like it, so the context must travel as a parameter — which is why
+`lull.Mien` exists as a named type at all, and why the vane arms
+are five and six parameters wide:
 
-This is probably the *right* trade — the dependency is visible in
-the signature, and Arvo's implicit spin is the kind of thing that
-makes a vane hard to test in isolation.
+```jock
+func call(s: St, mien: lull.Mien, duct: lull.Duct, task: lull.Card)
+    -> (List<lull.Move>, St)
+```
+
+This is listed last because it is probably the *right* trade. The
+dependency is visible in the signature, and Arvo's implicit spin
+is the kind of thing that makes a vane hard to test in isolation.
+It is a deficiency only in the narrow sense that there is no way
+to make it implicit when you want to.
 
 ---
 

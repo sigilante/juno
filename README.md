@@ -140,11 +140,25 @@ the port and it is a real loss, not a simplification.
 **Possible but unbuilt.** Kernel version negotiation (`%wyrd`,
 `$wynn`), OTA and the `+what` update engine, Arvo's own self-tasks
 (`%trim`/`%verb`/`%whey`), vane `+scry` threading, and a versioned
-state union for `+load` (the draft grafts same-shape).
+state union for `+load` (the draft grafts same-shape). Arvo also
+reseeds `eny` every event — `(shaz (cat 3 eny now))` — and juno
+does not, which would matter to a vane that wanted entropy.
 
 **Deliberately different.** Arvo `+spin`s each vane with
-`[duct eny dud]` as ambient context; juno passes what a vane needs
-as explicit parameters, which is why the vane arms are wide.
+`[duct eny dud]` as ambient context, and the clock and identity
+reach it from the kernel's own state. Jock has no ambient
+context, so it travels as a parameter: `lull.Mien`, which is
+Arvo's own `$mien` (`[our now eny]`), built per call in `+vcall`
+and `+vtake`.
+
+The asymmetry there is the faithful part. A vane receives the
+Mien and its own state, and hands back **only** its own state —
+so a vane can neither read nor write the kernel's, exactly as in
+Arvo, where a vane cannot reach Arvo's state either and a vane
+that could write `.now` would be wrong. The cost of having no
+ambient context is a named type and wider vane arms, which is
+arguably the right trade: the dependency is visible in the
+signature.
 
 ## Layout
 
@@ -161,6 +175,14 @@ takes a task and gives, which reaches `+call` and the `%give` leg.
 path that grows the duct past one frame and the only one that
 reaches `+take`. Between them one event exercises every mechanism
 in `+step` except `%slip`.
+
+`%d` also stamps `mien.now` into its own state. That is not a
+feature of a terminal — it is the only way to show from outside
+that the context was really handed down rather than assembled and
+dropped, and on the long path it proves more: the Mien built
+mid-loop for a *nested* pass carries that event's time, which a
+Mien built once at the top would also have satisfied on the short
+path alone.
 
 ## Build and run
 
