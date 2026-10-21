@@ -2,7 +2,9 @@
 
 Arvo is an event processor with a four-arm outer interface at four
 fixed axes. juno is that interface and that event loop, written in
-[Jock](https://github.com/sigilante/jock) instead of Hoon.
+Jock instead of Hoon. Jock is a statically-typed language that
+compiles to Nock; it is not yet published, so the build needs a
+checkout of it (see below).
 
 ## The ABI was already Arvo-shaped
 
