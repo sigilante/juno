@@ -97,8 +97,40 @@ Two deliberate deviations, both noted at their definitions:
 Three different reasons, kept apart on purpose:
 
 **Impossible without a Hoon compiler in the kernel.**
-`+wish` *is* "run the Hoon compiler", so axis `+10` is the atom
-`0`. A caller gets a crash rather than a wrong answer. Likewise
+`+wish` *is* "run the Hoon compiler", so axis `+10` is the bare
+atom `0` — what `+kbatt` puts in that slot. Reading it gives `0`;
+*firing* it is `*[core 0]`, an atom formula, which bails. Vere
+does exactly that: `_cv_nock_wish` reads the arm as a formula and
+nocks it against the core —
+
+    fun = u3n_nock_on(u3A->roc, u3x_at(_CVX_WISH, u3A->roc));
+    pro = u3n_slam_on(fun, txt);
+
+with `#define _CVX_WISH 10` — so a `0` there bails in Vere for
+the same reason it bails under a test interpreter.
+
+**But nothing fires it on the ship's own kernel.** Every
+`u3v_wish`/`u3v_do` call site in Vere is king-side — `dawn.c`
+(Azimuth boot), `io/ames.c` and `io/http.c` (path parsers),
+`io/mesa/pact.c`, and `main.c` (`urbit eval`) — and the king's
+`u3A->roc` is the **ivory pill**, a stock Hoon `%zuse` core cued
+for precisely this purpose (`--ivory-pill`, and `vortex.c`'s
+`"ivory"` tag check). That is why Vere can parse an HTTP path
+with `stap` without consulting the running Arvo. Nothing on the
+serf side wishes. So `+10` is, from the runtime's perspective,
+dead code in a ship's kernel.
+
+One stylistic note against the `0`, for whenever `+kbatt` is
+next touched: Arvo's own larval stub is `++ peek _~`, which
+*answers* `~` rather than bailing. A stub that answers and a stub
+that bails are different contracts, and the bare atom gives the
+worse diagnostic of the two — an unlabelled bail. The useful
+version is a formula producing a gate that crashes *with
+provenance*, the same reasoning that made jock's gall passthrough
+raise `%jock-abi-mismatch` instead of a bare mink bail. That is a
+`+kbatt` change in jock, not a change here.
+
+Likewise
 `%veer`-style runtime vane installation: Arvo can install a vane
 at runtime because a vane is a vase, i.e. data. A juno vane is
 code, so the vane table is a static dispatch and the set of vanes
