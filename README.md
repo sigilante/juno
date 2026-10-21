@@ -180,6 +180,26 @@ and a two-frame duct, checking the duct discipline by its
 observable consequences: which vane ran, how deep the duct got,
 and what reached the runtime.
 
+The duct discipline is pinned by mutation, not just exercised:
+making `%pass` cons `%$` instead of the real source leaves the
+short path **entirely green** -- that path's source genuinely is
+`%$`, so the mutation is inert there -- and crashes the long path
+on the empty-duct assert in `%give`. So the long path depends on
+the source-cons rather than passing for some other reason, which
+is the only thing a green loop test can be worth.
+
+Two soft spots, both deliberate and neither hidden in the code:
+
+- **`%slip` is written but unexercised.** Neither vane slips, so
+  that case of `+step` is reachable by no test. It is present
+  because the loop is not faithful without it, and it is
+  currently the one case resting on reading rather than running.
+- **`+peek` is shallower than Arvo's.** Arvo's takes
+  `[lyc=gang nom=…]` and threads into each vane's `+scry`; this
+  one answers kernel state only. The harness uses it as an
+  observation port, which is honest, but it means peek is tested
+  as an instrument rather than as the arm Vere would call.
+
 It has never been booted by Vere. See above for what that would
 take.
 
