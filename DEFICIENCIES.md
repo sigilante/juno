@@ -4,45 +4,11 @@ Written while building `juno`. Each item is something that
 actually cost something here, not a wishlist. Ordered by what it
 cost.
 
-## 1. No functional record update
+Everything below was checked by running it, not by reading the
+compiler. Where a claim is about what Jock *cannot* do, the
+refusal tag is named.
 
-The big one.
-
-Hoon's whole idiom for a state machine is the mutation form:
-`..poke(sol q.p.zef)`, `this(run [pan run])`,
-`..pith(lac.fad ?~(p.waif !lac.fad u.p.waif))`. Arvo's event loop
-is *built* out of it — `+emit` is one such update, `+step` is a
-`?-` whose every branch is another, and the kernel arms end by
-rebuilding themselves around one changed field.
-
-Jock has no equivalent. To change one field of a struct you
-respell every field:
-
-```jock
-match dill.call(v.d, duct, task) {
-  (mz, d2) => (mz, Vanes( d: d2, e: v.e )),
-}
-```
-
-Two structural concessions in this port come from that and
-nothing else:
-
-- the vane states were split into their own `Vanes` struct so the
-  loop would not respell the kernel's scalar fields (`now`, `our`,
-  `eny`, `lac`) at every step;
-- `+vcall` and `+vtake` exist partly to confine the respelling to
-  two sites instead of six.
-
-Both are defensible as design, which is what makes this worth
-flagging: the workaround is invisible in the result. Scale it to a
-real Arvo — seven state fields, ten vanes — and every state write
-is a ten-field literal whose correctness is a reader's eyeball
-over ten `x: s.x` pairs. That is where a transcription bug lives.
-
-Not in `docs/spec/language.md`, not in `docs/POSSIBLES.md`, so
-this appears to be unrecorded rather than deferred.
-
-## 2. Recursive enums cannot be declared
+## 1. Recursive enums cannot be declared
 
 Arvo's `$ball` is `(wite [vane task] maze)` and `$wite`'s `%hurl`
 case carries **another** `$wite`. Jock cannot declare that, so
@@ -50,7 +16,7 @@ juno models the error as a field of the move
 (`struct Move { duct, ball, dud: Goof? }`) and drops `%hurl` from
 the enum.
 
-That substitution is sound here — `%hurl`'s entire effect in
+The substitution is sound here — `%hurl`'s entire effect in
 `+step` is "set `.dud` and re-step the inner ball", which is
 exactly one level of nesting — and it reads flatter than the
 original. But it was a judgement call forced by the language, and
@@ -61,7 +27,7 @@ for the chain work ("recursive untagged union cannot be declared
 from source at all"). juno is a second, independent customer,
 which makes it a pattern rather than a one-off.
 
-## 3. Mutual recursion is positional, and fails silently
+## 2. Mutual recursion is positional, and fails silently
 
 `+vcall`, `+vtake`, `+step` and `+drain` are mutually recursive.
 That requires them to be **textually contiguous** `func`s: a run
@@ -77,7 +43,7 @@ expresses the constraint, and nothing in the error points at it.
 together"* hint; `grep` finds no such string in `mint.hoon`, so
 the diagnostic the spec describes does not exist.
 
-## 4. Inference does not flow into a call
+## 3. Inference does not flow into a call
 
 `cons` is `func<T> cons(x: T, xs: List<T>) -> List<T>`. Writing a
 one-element wire as
@@ -109,21 +75,68 @@ numeric literal passed to `cons` needs `(x as! Char)` to pin `T`
 against a `List<Char>` tail. Two independent customers for
 checking-position propagation.
 
-## 5. `parse.hoon`'s own precedence table is stale
+## 4. `parse.hoon`'s own precedence table is stale
 
-Not a language gap — a documentation bug, in the compiler.
+Not a language gap — a documentation bug, in the compiler, about
+a spelling the language actively refuses.
 
 `crates/jockc/hoon/lib/parse.hoon:14` and `:34` both list a
 postfix **`struct-literal {`** at precedence level 2. There is no
-such form: `+p-post` accepts a glued `(` (call / struct literal),
-a glued `[` (index) and `.` (field), and nothing else.
-`docs/spec/language.md:5` records that the syntax arc "moved
-construction to the glued paren", which is what actually happened.
+such form, and there is not meant to be: `+p-post` accepts a
+glued `(`, a glued `[` and `.` only; `{` in expression position
+is a block (`+p-brace`); and the corpus pins the brace spelling as
+an **error** — `t-arc-ctor-brace` asserts that
+`let p = P{ x: 1 }` refuses `%parse-expected`, paired with
+`t-arc-ctor` for the surviving `P(x: 1, y: 2)`.
+`docs/spec/language.md:5` records the retirement.
 
-A reader trusting the compiler's own table writes `St( n: 0 )` for
-a statement and `St{ n: 0 }` inside a tuple, and the second gets
-`%parse-expected %')'` pointing at the brace. Cost here: one build
-cycle, which is not cheap (see 8).
+So the compiler's own table documents a form its own test suite
+pins as gone. A reader trusting the table writes `St{ n: 0 }` and
+gets `%parse-expected %')'` at the brace.
+
+`docs/spec/language.md:105` is loose in the same direction: "An
+un-glued `(`, `[`, or `{` is never postfix" implies a *glued* `{`
+would be. The table at `:196` is correct and lists no brace.
+
+## 5. Record update is a statement, not an expression
+
+**This item previously claimed Jock had no functional record
+update at all. That was wrong, and the error is kept visible here
+because it changed the shape of this repository — see below.**
+
+Jock *does* have it. A `var` rebinding plus a field write lowers
+to a Nock edit at the field's axis, which is exactly what Hoon's
+`s(d d2)` does:
+
+```jock
+func bump(s: S) -> S { var t = s; t.b = 99; t };
+// bump(S(a: 1, b: 2, c: 3))  ->  (1, (99, 3))
+```
+
+It works through a function parameter, through a **nested** path
+in one statement (`t.v.d.blits = 7`), and inside a `match` arm,
+with sibling fields preserved — all checked by running it.
+`+mint`'s `%edit` arm resolves the whole limb path, requires the
+binding be mutable (`%mint-edit-immutable` otherwise), and refuses
+a write through an imported sealed class with an unusually good
+message (`%mint-edit-sealed`: "a class is written only by the
+module that declares it; ask it for an arm that rebuilds").
+
+What is actually missing is small: it is a **statement over a
+mutable rebinding**, where Hoon's is an inline expression. Hoon
+writes `k(v v2)` anywhere a value goes; Jock needs
+`{ var t = k; t.v = v2; t }` — three statements, a block, and a
+name you have to invent. About two extra lines per update site.
+
+**The cost of getting this wrong was structural.** Believing there
+was no record update, this port split the vane states into their
+own `Vanes` struct and routed every state write through `+vcall`
+and `+vtake`, purely to avoid respelling the kernel's scalar
+fields. None of that was necessary. Worse, it reads as design, so
+nothing in the result advertises that it is a workaround for a
+limitation that does not exist — which is the failure mode worth
+recording: a language gap *assumed* rather than tested will show
+up as architecture.
 
 ## 6. `loop` is a keyword
 
@@ -150,15 +163,14 @@ to build, and a one-character syntax error costs the whole build
 before it reports. Evaluating the emitted trap costs that again,
 because kicking it *is* running the compiler — which is also why
 the test harness takes an already-evaluated core rather than the
-trap `build.sh` produces. That turns ordinary syntax uncertainty — *is it `{` or
-`(`?* — into an expensive question, which is why item 5 mattered
-enough to write down.
+trap `build.sh` produces.
 
-Nothing here is wrong, and a compiler written in Hoon running
-under `honk` is not going to be fast. But it changes how one
-writes Jock: you read the compiler source to settle syntax
-questions rather than trying them, which is only possible because
-the compiler source happens to be at hand.
+`tools/jockc.sh run` is the cheap door and was badly
+under-used here: it compiles and evaluates a small program in
+seconds, with no kernel and no trap. Both corrections in this file
+— items 4 and 5 — were settled by a ten-line program through
+`jockc.sh run`. The expensive path is for artifacts, not for
+questions.
 
 ## 9. No ambient context for a callee
 
@@ -169,9 +181,7 @@ like it, so every vane arm carries the context explicitly:
 
 This is probably the *right* trade — the dependency is visible in
 the signature, and Arvo's implicit spin is the kind of thing that
-makes a vane hard to test in isolation. It is listed because it
-compounds with item 1: wide arms plus no record update is what
-makes the loop's plumbing the bulk of its text.
+makes a vane hard to test in isolation.
 
 ---
 
@@ -189,6 +199,10 @@ notices and is not the whole picture.
 - **`enum` with payload cases is exactly `$ball`.** `.pass(p) =>`
   destructuring a tagged case is a direct transcription of
   Arvo's `?-  -.ball.move`, with exhaustiveness checked.
+- **Record update is a Nock edit, through nested paths.** See
+  item 5: `t.v.d.blits = 7` edits at the axis and preserves
+  siblings, which is the Hoon idiom's actual semantics and not an
+  approximation of it.
 - **`T?` needed no unit combinators.** `dud: Goof?` and
   `match d2 { ~ => …, _ => … }` is the whole of it.
 - **The mirror-struct-plus-`as!` idiom reads the event cleanly.**
