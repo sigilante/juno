@@ -15,7 +15,7 @@ that puts the arms at:
 | axis | arm | Arvo |
 |------|-----|------|
 | `+4`  | load | `+load`, state migration |
-| `+10` | — (atom `0`) | `+wish`, parse-against-`%zuse` |
+| `+10` | — (atom `0`, and it should not be) | `+wish`, parse-against-`%zuse` |
 | `+22` | peek | `+peek`, scry |
 | `+23` | poke | `+poke`, event application |
 
@@ -98,6 +98,9 @@ Two deliberate deviations, both noted at their definitions:
 
 Three different reasons, kept apart on purpose:
 
+**Impossible for the kernel itself** (but see the `+10` note
+below — `+wish` does not have to be the kernel's job).
+
 **Impossible without a Hoon compiler in the kernel.**
 `+wish` *is* "run the Hoon compiler", so axis `+10` is the bare
 atom `0` — what `+kbatt` puts in that slot. Reading it gives `0`;
@@ -122,15 +125,47 @@ with `stap` without consulting the running Arvo. Nothing on the
 serf side wishes. So `+10` is, from the runtime's perspective,
 dead code in a ship's kernel.
 
-One stylistic note against the `0`, for whenever `+kbatt` is
-next touched: Arvo's own larval stub is `++ peek _~`, which
-*answers* `~` rather than bailing. A stub that answers and a stub
-that bails are different contracts, and the bare atom gives the
-worse diagnostic of the two — an unlabelled bail. The useful
-version is a formula producing a gate that crashes *with
-provenance*, the same reasoning that made jock's gall passthrough
-raise `%jock-abi-mismatch` instead of a bare mink bail. That is a
-`+kbatt` change in jock, not a change here.
+**The `0` should not be there at all, and "stub it better" was
+the wrong idea.** NockApp already solves this, and the solution is
+not a stub. `hoon/common/wrapper.hoon` defines a three-armed inner
+kernel and a four-armed outer one:
+
+    +$  fort        load, peek, poke
+    +$  outer-fort  load, peek, poke, wish
+
+and `outer.hoon` is one line — `((moat:dumb |) inner:dumb)` —
+applying the wrapper to the inner kernel. The wrapper's `+wish` is
+real:
+
+    ++  wish
+      |=  txt=@
+      ^-  *
+      q:(slap !>(~) (ream txt))
+
+It compiles Hoon against an **empty subject** rather than Arvo's
+`%zuse`, so it needs no stdlib — and it lives in the wrapper, so
+the inner kernel never supplies it.
+
+Jock's `Kernel` trait is already exactly `+$ fort`. So `+kbatt`
+is hand-rolling the *outer* shape and getting the one slot it has
+nothing to put in wrong — a bare atom where a formula belongs.
+The fix is to emit the inner three arms and let a Hoon wrapper
+supply the fourth, which also makes a working `+wish` available
+without Jock gaining any capability. `ream`/`slap` are not in
+`+harms` and could not be added casually (it is pinned by
+`ABI_MUG` and `t-fabi-frozen`), so the wrapper is Hoon-side —
+the same thin seam the gall work settled on.
+
+Two things the pattern gives beyond the wish slot. The wrapper is
+an **ABI translation** layer, not just a supplier: NockApp's inner
+`+poke` takes `[num=@ ovum=*]` and its `+peek` takes
+`path -> (unit (unit *))`, where Arvo's are `[now=@da ovo=ovum]`
+and `[lyc nom] -> (unit (cask))` — different in both arms, so a
+juno wrapper translates differently than NockApp's. And
+`+$ outer-state` is `[%0 desk-hash=(unit @uvI) internal=inner]`,
+a **versioned envelope** whose `+load` dispatches on `-.old` —
+which is the answer to the `+load` gap noted above, where this
+draft grafts same-shape.
 
 Likewise
 `%veer`-style runtime vane installation: Arvo can install a vane
