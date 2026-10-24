@@ -27,21 +27,46 @@ for the chain work ("recursive untagged union cannot be declared
 from source at all"). juno is a second, independent customer,
 which makes it a pattern rather than a one-off.
 
-## 2. Mutual recursion is positional, and fails silently
+## 2. A class and its helper funcs cannot see each other
 
-`+vcall`, `+vtake`, `+step` and `+drain` are mutually recursive.
-That requires them to be **textually contiguous** `func`s: a run
-of adjacent `func` declarations is made mutually visible, and any
-interposed declaration splits the run, after which the forward
-call is a bare `%mint-limb` with no explanation.
+**This item previously said mutual recursion "fails silently" and
+that a promised diagnostic did not exist. Both halves were wrong,
+and the error is left visible because the way I got it wrong is
+the recurring one — see item 8.**
 
-So the loop in `juno.jock` is one block fenced by a comment asking
-the reader not to insert anything into it. Nothing in the language
-expresses the constraint, and nothing in the error points at it.
+The adjacency rule is real: a run of consecutive `func`
+declarations is mutually visible, and an interposed declaration
+splits the run. But the diagnostic is **excellent**, not absent.
+The compiler says:
 
-`docs/spec/language.md:269` promises a *"move these `func`s
-together"* hint; `grep` finds no such string in `mint.hoon`, so
-the diagnostic the spec describes does not exist.
+> `bump` is unbound: no binding, declaration, or import provides
+> it; if it is a `func` declared below, only ADJACENT funcs see
+> each other — move them together
+
+I had claimed `language.md:269` promised that hint and `mint.hoon`
+lacked it. I grepped for the wrong string and concluded absence.
+
+**The real constraint, found by hitting it.** A class-based kernel
+cannot keep its loop in free functions, in *either* order:
+
+- funcs declared **before** the class cannot name the class type
+  (`%elab-unbound 'Juno'`);
+- the class's arms cannot call funcs declared **after** it (only
+  adjacent funcs see each other, per the hint above).
+
+So there is no arrangement in which `class Juno(St) impl
+Kernel<Ovum>` has a loop of free functions. The loop must be
+methods of the same class.
+
+That is a genuine expressiveness gap — the two scoping rules are
+each reasonable and their intersection excludes a natural program
+shape. It is also, in this case, an improvement: as methods `self`
+*is* the kernel, so threading state is dispatch rather than a
+fifth parameter, and mutually recursive methods work without any
+adjacency discipline (verified: `drain` and `step` call each other
+freely inside the class body). The comment that used to fence the
+loop against insertion is gone, because the constraint it guarded
+no longer applies.
 
 ## 3. Inference does not flow into a call
 

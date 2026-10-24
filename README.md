@@ -15,7 +15,7 @@ that puts the arms at:
 | axis | arm | Arvo |
 |------|-----|------|
 | `+4`  | load | `+load`, state migration |
-| `+10` | — (atom `0`; should be a formula) | `+wish`, parse-against-`%zuse` |
+| `+10` | crash formula `[0 0]` | `+wish`, parse-against-`%zuse` |
 | `+22` | peek | `+peek`, scry |
 | `+23` | poke | `+poke`, event application |
 
@@ -125,19 +125,21 @@ with `stap` without consulting the running Arvo. Nothing on the
 serf side wishes. So `+10` is, from the runtime's perspective,
 dead code in a ship's kernel.
 
-**The `0` is wrong for a narrow, certain reason, and what should
-replace it is an open question.**
+**Fixed upstream, 2026-10-24.** The slot used to hold the bare
+atom `0`, and the runtime reads the arm as a **formula**
+(`u3n_nock_on(roc, u3x_at(10, roc))`) — so an atom there was not a
+refusal but a *malformed kernel*, bailing structurally. It now
+holds `[0 0]`, a zero-axis read: well-formed as a formula, bails
+cleanly. A `%mean`-hinted refusal naming the trait would be better
+diagnostics still, and is deferred; the structural defect was the
+atom.
 
-The certain part: the slot holds an **atom**, and the runtime
-reads the arm as a **formula** (`u3n_nock_on(roc, u3x_at(10, roc))`).
-An atom is not a formula, so the bail is *structural* rather than
-a refusal — the kernel is malformed at that axis, not declining.
-
-Near term the slot should hold a **crash arm**: a formula that
-refuses, with provenance, so a caller learns that this kernel does
-not answer `+wish` instead of reading an unlabelled bail. That is
-the same reasoning that made jock's gall passthrough raise
-`%jock-abi-mismatch` rather than let a mink bail through.
+**And `+wish` no longer has to be absent.** jock gained
+`trait FullKernel<E>`, a fourth arm at `+10`, along
+`trait Kernel<E>`. juno impls `Kernel` — three arms — because
+Arvo's `+wish` *is* the Hoon compiler and this kernel has nothing
+to answer with. That is now a statement about juno rather than
+about the adapter.
 
 What it should hold *eventually* is deliberately not settled here,
 and nothing in this draft should foreclose it. Two live options:

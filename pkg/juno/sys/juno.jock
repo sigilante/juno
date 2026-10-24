@@ -12,6 +12,23 @@
 // its depth-first ordering, its %$ pseudo-vane for the runtime
 // boundary, and two vanes to drive all of it.
 //
+// The four arms are an `impl Kernel<lull.Ovum>` rather than an
+// explicit quad.  The quad was not a choice:  the kernel trait used
+// to fix poke's return to (List<Effect>, Self), and an Arvo gives
+// OVUMS, so naming the trait was impossible and the raw tuple was
+// the only way out.  The trait is parameterized over its effect
+// vocabulary now, so the escape hatch is gone and the kernel says
+// what it answers with.
+//
+// The loop rides as METHODS of the same class, not as free funcs,
+// and that is forced rather than chosen:  a func cannot name a
+// class declared after it (%elab-unbound) and a class arm cannot
+// call a func declared after IT (only adjacent funcs see each
+// other), so a class-based kernel whose loop is free functions
+// cannot be written in either order.  As methods it reads better
+// anyway --- `self` IS the kernel, so threading the state is
+// dispatch rather than a parameter.
+//
 // What is deliberately not here: +wish (it IS the Hoon compiler),
 // %veer-style runtime vane installation (a vane is code, not a
 // vase), kelvin negotiation, and OTA.  README.md says which of
@@ -31,19 +48,14 @@ import echo;
 // for a limitation Jock does not have.  A `var` rebinding plus a
 // field write is a Nock edit at that field's axis, so the loop
 // below threads the whole kernel and writes one field of it.
-struct Juno { now: @, our: @, eny: @, lac: @, d: dill.St, e: echo.St };
+struct St { now: @, our: @, eny: @, lac: @, d: dill.St, e: echo.St };
 
 // the event the runtime hands +23.  Arvo's sample is
 // [now=@da ovo=ovum] with ovum=[wire card] and card=[mark noun],
 // which flattens to this four-field mirror.
 struct Event { now: @, wire: lull.Wire, mark: @, data: * };
 
-// ---------------------------------------------------------------
-// The loop.  These four arms are mutually recursive and must stay
-// CONTIGUOUS: Jock makes a run of consecutive `func`s visible to
-// one another, and any interposed declaration splits the run and
-// turns the forward calls into %mint-limb.
-// ---------------------------------------------------------------
+class Juno(St) impl Kernel<lull.Ovum> {
 
 // +vcall: route a task to a vane, replacing that vane's state.
 // Arvo looks the vane up in a (map term vane) and +slaps it;
@@ -52,16 +64,16 @@ struct Event { now: @, wire: lull.Wire, mark: @, data: * };
 // The Mien is built per call and handed down.  A vane gets it and
 // its own state, and hands back only its own state -- so a vane
 // cannot reach or write the kernel's, exactly as in Arvo.
-func vcall(k: Juno, way: @, duct: lull.Duct, task: lull.Card)
+  vcall(self: Juno, way: @, duct: lull.Duct, task: lull.Card)
     -> (List<lull.Move>, Juno) {
-  let m = lull.Mien( our: k.our, now: k.now, eny: k.eny );
+  let m = lull.Mien( our: self.our, now: self.now, eny: self.eny );
   if way == %d {
-    match dill.call(k.d, m, duct, task) {
-      (mz, d2) => { var t = k; t.d = d2; (mz, t) },
+    match dill.call(self.d, m, duct, task) {
+      (mz, d2) => { var t = self; t.d = d2; (mz, t) },
     }
   } else if way == %e {
-    match echo.call(k.e, m, duct, task) {
-      (mz, e2) => { var t = k; t.e = e2; (mz, t) },
+    match echo.call(self.e, m, duct, task) {
+      (mz, e2) => { var t = self; t.e = e2; (mz, t) },
     }
   } else {
     // Arvo routes way=%$ to +call:pith, its own %trim/%verb/%whey
@@ -71,16 +83,16 @@ func vcall(k: Juno, way: @, duct: lull.Duct, task: lull.Card)
 };
 
 // +vtake: hand a vane a response on the wire it passed.
-func vtake(k: Juno, way: @, duct: lull.Duct, wire: lull.Wire,
+  vtake(self: Juno, way: @, duct: lull.Duct, wire: lull.Wire,
            sign: lull.Sign) -> (List<lull.Move>, Juno) {
-  let m = lull.Mien( our: k.our, now: k.now, eny: k.eny );
+  let m = lull.Mien( our: self.our, now: self.now, eny: self.eny );
   if way == %d {
-    match dill.take(k.d, m, duct, wire, sign) {
-      (mz, d2) => { var t = k; t.d = d2; (mz, t) },
+    match dill.take(self.d, m, duct, wire, sign) {
+      (mz, d2) => { var t = self; t.d = d2; (mz, t) },
     }
   } else if way == %e {
-    match echo.take(k.e, m, duct, wire, sign) {
-      (mz, e2) => { var t = k; t.e = e2; (mz, t) },
+    match echo.take(self.e, m, duct, wire, sign) {
+      (mz, e2) => { var t = self; t.e = e2; (mz, t) },
     }
   } else {
     crash
@@ -88,16 +100,16 @@ func vtake(k: Juno, way: @, duct: lull.Duct, wire: lull.Wire,
 };
 
 // +step: route one move.  This is Arvo's +step arm, case for case.
-func step(k: Juno, src: @, mv: lull.Move, run: List<lull.Plan>,
+  step(self: Juno, src: @, mv: lull.Move, run: List<lull.Plan>,
           out: List<lull.Ovum>) -> (List<lull.Ovum>, Juno) {
   match mv.ball {
     // %pass: cons the SOURCE onto the wire, and the wire onto the
     // duct.  That is the whole of Arvo's causal bookkeeping.
     .pass(p) => {
       let d2 = cons(cons(src, p.wire), mv.duct);
-      match vcall(k, p.note.vane, d2, p.note.task) {
+      match self.vcall(p.note.vane, d2, p.note.task) {
         (mz, k2) =>
-          drain(k2, cons(lull.Plan( vane: p.note.vane, moves: mz ), run), out),
+          k2.drain(cons(lull.Plan( vane: p.note.vane, moves: mz ), run), out),
       }
     },
     // %slip: lateral.  The duct is NOT touched, so the callee's
@@ -105,9 +117,9 @@ func step(k: Juno, src: @, mv: lull.Move, run: List<lull.Plan>,
     // the slipping vane.  Arvo's own comment calls this a code
     // smell that should nearly always be avoided; it is here
     // because the loop is not faithful without it.
-    .slip(n) => match vcall(k, n.vane, mv.duct, n.task) {
+    .slip(n) => match self.vcall(n.vane, mv.duct, n.task) {
       (mz, k2) =>
-        drain(k2, cons(lull.Plan( vane: n.vane, moves: mz ), run), out),
+        k2.drain(cons(lull.Plan( vane: n.vane, moves: mz ), run), out),
     },
     // %give: pop the duct.  The popped wire's HEAD names the
     // target and its TAIL is the wire handed back to that target.
@@ -121,14 +133,14 @@ func step(k: Juno, src: @, mv: lull.Move, run: List<lull.Plan>,
           // the outside from anywhere but the bottom of the stack
           // means a wire was pushed and never popped.
           match d2 {
-            ~ => drain(k, run, cons(lull.Ovum( wire: wr, card: g ), out)),
+            ~ => self.drain(run, cons(lull.Ovum( wire: wr, card: g ), out)),
             _ => crash,
           }
         } else {
           // cons the SOURCE onto the gift to make a sign
-          match vtake(k, way, d2, wr, lull.Sign( vane: src, gift: g )) {
+          match self.vtake(way, d2, wr, lull.Sign( vane: src, gift: g )) {
             (mz, k2) =>
-              drain(k2, cons(lull.Plan( vane: way, moves: mz ), run), out),
+              k2.drain(cons(lull.Plan( vane: way, moves: mz ), run), out),
           }
         },
       },
@@ -145,29 +157,31 @@ func step(k: Juno, src: @, mv: lull.Move, run: List<lull.Plan>,
 // move to breadth-first, which guarantees moves are processed in
 // the order they were emitted.  Here that is one word -- append
 // instead of cons, in the three +step sites and nowhere else.
-func drain(k: Juno, run: List<lull.Plan>, out: List<lull.Ovum>)
+  drain(self: Juno, run: List<lull.Plan>, out: List<lull.Ovum>)
     -> (List<lull.Ovum>, Juno) {
   match run {
-    ~ => (lx-rev(out), k),
+    ~ => (lx-rev(out), self),
     (p, rest) => match p.moves {
-      ~ => drain(k, rest, out),
+      ~ => self.drain(rest, out),
       (mv, more) =>
-        step(k, p.vane, mv,
+        self.step(p.vane, mv,
              cons(lull.Plan( vane: p.vane, moves: more ), rest), out),
     },
   }
 };
 
 // ---------------------------------------------------------------
-// The four arms, as an explicit (poke, peek, load, state) quad.
-// The quad is used rather than `impl Kernel` because Kernel fixes
-// poke's return to (List<Effect>, Self) and an Arvo gives ovums.
+// The three arms Arvo's ABI addresses.  +wish, at +10, is not one
+// of them:  it IS the Hoon compiler, so this kernel impls Kernel
+// rather than FullKernel and the adapter puts a crash formula
+// there.  See README.md for why that is a smaller loss than it
+// looks.
 // ---------------------------------------------------------------
-(
+
   // +poke/+23.  Arvo seeds a worklist of one whose germ vane is
   // %$ -- itself -- and whose single move is a %pass built by
   // +gest, then drains to quiescence.
-  lambda (s: Juno, e: *) -> (List<lull.Ovum>, Juno) {
+  poke(self: Juno, e: *) -> (List<lull.Ovum>, Juno) {
     let ev = e as! Event;
     // +gest: the ovum's wire HEAD names the target vane and its
     // tail is the wire the vane is called on.
@@ -179,7 +193,7 @@ func drain(k: Juno, run: List<lull.Plan>, out: List<lull.Ovum>)
         // the previous one's.  (Arvo also reseeds .eny per event,
         // via (shaz (cat 3 eny now)); juno does not, which would
         // matter to a vane that wanted entropy.)
-        var k0 = s;
+        var k0 = self;
         k0.now = ev.now;
         let m = lull.Move(
           duct: ~,
@@ -189,28 +203,31 @@ func drain(k: Juno, run: List<lull.Plan>, out: List<lull.Ovum>)
                           task: lull.Card( mark: ev.mark,
                                            data: ev.data )))),
           dud: ~ );
-        drain(k0, cons(lull.Plan( vane: lull.outside(),
-                                  moves: cons(m, ~) ), ~), ~)
+        k0.drain(cons(lull.Plan( vane: lull.outside(),
+                                 moves: cons(m, ~) ), ~), ~)
       },
     }
-  },
+  };
+
   // +peek/+22.  Arvo's sample is [lyc=gang nom=...] and it threads
   // into each vane's +scry.  This answers only the kernel's own
   // state, which is enough for the harness to observe the loop.
-  lambda (s: Juno, p: *) -> * {
+  peek(self: Juno, p: *) -> * {
     let w = p as! List<@>;
     match w {
-      ~ => s.now,
-      (h, t) => if h == %blits { s.d.blits }
-                else if h == %last { s.d.last }
-                else if h == %echoes { s.e.echoes }
+      ~ => self.now,
+      (h, t) => if h == %blits { self.d.blits }
+                else if h == %last { self.d.last }
+                else if h == %echoes { self.e.echoes }
                 else { crash },
     }
-  },
+  };
+
   // +load/+4.  Arvo runs +next-soul adapters across six state
   // versions.  A same-shape graft is all a draft needs; a real one
-  // wants a versioned state union.
-  lambda (s: Juno, old: *) -> Juno { old as! Juno },
-  Juno( now: 0, our: 0, eny: 0, lac: 0,
-        d: dill.St( blits: 0, last: 0 ), e: echo.St( echoes: 0 ) )
-)
+  // wants a versioned state union -- NockApp's own outer-state is
+  // the pattern (README.md).
+  load(self: Juno, old: *) -> Juno { old as! Juno };
+};
+Juno( now: 0, our: 0, eny: 0, lac: 0,
+      d: dill.St( blits: 0, last: 0 ), e: echo.St( echoes: 0 ) )

@@ -82,10 +82,21 @@ def main(argv):
             fails.append(name)
 
     print("ABI: arms on Arvo's axes")
-    for ax, nm, cell in ((4, "load +4", True), (10, "wish +10", False),
-                         (22, "peek +22", True), (23, "poke +23", True)):
-        ck("%s is %s" % (nm, "an arm" if cell else "stubbed 0"),
-           isinstance(vexrun.slot(core, ax), tuple), cell)
+    for ax, nm in ((4, "load +4"), (22, "peek +22"), (23, "poke +23")):
+        ck("%s is an arm" % nm, isinstance(vexrun.slot(core, ax), tuple),
+           True)
+    #  +10 is +wish's slot and this kernel impls the three-arm trait,
+    #  so the adapter puts a CRASH FORMULA there.  It must be a
+    #  formula -- the bare atom that used to sit here was not one, so
+    #  the runtime met a malformed arm rather than a refusal -- and it
+    #  must bail when fired.  Both halves are the contract.
+    ck("wish +10 is a formula", isinstance(vexrun.slot(core, 10), tuple),
+       True)
+    try:
+        vexrun.nock(core, (9, (10, (0, 1))))
+        ck("wish +10 refuses when fired", "did not crash", "a crash")
+    except vexrun.Crash:
+        ck("wish +10 refuses when fired", True, True)
 
     #  SHORT PATH: an event routed straight to %d.  The ovum's wire
     #  head names the vane (+gest), so /d reaches dill with wire ~.
