@@ -10,11 +10,15 @@ refusal tag is named.
 
 ## 1. Recursive enums cannot be declared
 
+**This heading is WRONG, measured 2026-10-29. Recursive enums CAN
+be declared; a non-recursive case has to come first. The
+flattening below still stands, but for a different reason, and the
+reason is in the correction at the end of this item.**
+
 Arvo's `$ball` is `(wite [vane task] maze)` and `$wite`'s `%hurl`
-case carries **another** `$wite`. Jock cannot declare that, so
-juno models the error as a field of the move
-(`struct Move { duct, ball, dud: Goof? }`) and drops `%hurl` from
-the enum.
+case carries **another** `$wite`. juno models the error as a field
+of the move (`struct Move { duct, ball, dud: Goof? }`) and drops
+`%hurl` from the enum.
 
 The substitution is sound here — `%hurl`'s entire effect in
 `+step` is "set `.dud` and re-step the inner ball", which is
@@ -22,10 +26,42 @@ exactly one level of nesting — and it reads flatter than the
 original. But it was a judgement call forced by the language, and
 the next recursive type may not have an equivalent flattening.
 
-`crates/jockc/hoon/lib/chaintx.jock:188` already records this wall
+`crates/jockc/hoon/lib/chaintx.jock:188` records a DIFFERENT wall
 for the chain work ("recursive untagged union cannot be declared
-from source at all"). juno is a second, independent customer,
-which makes it a pattern rather than a one-off.
+from source at all"), which is about untagged unions and is real.
+This item borrowed its authority and should not have.
+
+**The correction, measured rather than assumed.** A recursive
+tagged enum declares, constructs and matches:
+
+```jock
+enum Wite { pass(@), give(@), hurl(Goof, Wite) };
+```
+
+What refuses is the ORDER. With the recursive case first the
+compiler says, precisely:
+
+> the FIRST case of this union contains it, so the bunt diverges;
+> a non-recursive case must come first --- reorder the cases
+
+because the default value is built from case one. With no
+non-recursive case at all there is no smallest value, and it
+refuses for that reason instead. A struct cannot name itself bare
+but recurses through `T?`.
+
+So `$wite` was declarable. What it actually hits is that `$wite`
+is GENERIC (`wite` takes two parameters), and a recursive generic
+enum declares once reordered but trips `%mint-inst` when a case is
+constructed --- the generic-instantiation annotation tax, a
+separate limitation with its own entry in the Jock notes. The
+flattening was therefore the right call and this item had the
+wrong reason for it, which is item 8's failure mode again: I
+concluded from one refusal instead of varying the program until it
+said what it meant.
+
+The general rules now live in Jock's own LLM guide
+(`site/llms-guide.md`), where a model will meet them before
+hitting them.
 
 ## 2. A class and its helper funcs cannot see each other
 
@@ -46,17 +82,23 @@ The compiler says:
 I had claimed `language.md:269` promised that hint and `mint.hoon`
 lacked it. I grepped for the wrong string and concluded absence.
 
-**The real constraint, found by hitting it.** A class-based kernel
-cannot keep its loop in free functions, in *either* order:
+**The real constraint, found by hitting it** — and narrower than
+this item's heading, measured 2026-10-29. A class's arms CAN call a
+free func declared **before** the class. What fails is narrower:
 
-- funcs declared **before** the class cannot name the class type
+- funcs declared **before** the class cannot NAME the class type
   (`%elab-unbound 'Juno'`);
-- the class's arms cannot call funcs declared **after** it (only
-  adjacent funcs see each other, per the hint above).
+- the class's arms cannot call funcs declared **after** it
+  (`%mint-limb`; only adjacent funcs see each other, per the hint
+  above).
 
-So there is no arrangement in which `class Juno(St) impl
-Kernel<Ovum>` has a loop of free functions. The loop must be
-methods of the same class.
+So a plain helper that neither takes nor returns the class sits
+happily ahead of it. There is still no arrangement in which
+`class Juno(St) impl Kernel<Ovum>` has a loop of free functions,
+because a loop threading the kernel's state must name the class
+type in its signature — which is the half that matters here, and
+the half this item's heading overstates. The loop must be methods
+of the same class.
 
 That is a genuine expressiveness gap — the two scoping rules are
 each reasonable and their intersection excludes a natural program
