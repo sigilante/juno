@@ -203,7 +203,9 @@ Arvo `+spin`s a vane with `[duct eny dud]` so that the vane's own
 arms stay narrow and the context is implicit. Jock has nothing
 like it, so the context must travel as a parameter — which is why
 `lull.Mien` exists as a named type at all, and why the vane arms
-are five and six parameters wide:
+are four and five parameters wide — `call(s, mien, duct, task)`
+and `take(s, mien, duct, wire, sign)`. (This said "five and six"
+until 2026-10-29, counted against nothing; the arms are below.)
 
 ```jock
 func call(s: St, mien: lull.Mien, duct: lull.Duct, task: lull.Card)
